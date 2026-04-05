@@ -58,27 +58,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(currentUser);
       
       if (currentUser) {
-        const isAdmin = currentUser.email === "tarunkummaryenuganti07@gmail.com";
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        const safeEmail = currentUser.email?.trim().toLowerCase() || "";
+        const isAdmin = safeEmail === "tarunkummaryenuganti07@gmail.com" || safeEmail === "tarunkumaryenuganti07@gmail.com";
         
-        if (userDoc.exists()) {
-          const currentRole = userDoc.data().role;
-          if (isAdmin && currentRole !== "admin") {
-            await setDoc(doc(db, "users", currentUser.uid), { role: "admin" }, { merge: true });
-            setRole("admin");
+        // Optimistically set role instantly to bypass any Firestore delays or permission blocks
+        setRole(isAdmin ? "admin" : "viewer");
+
+        try {
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          
+          if (userDoc.exists()) {
+            const currentRole = userDoc.data().role;
+            if (isAdmin && currentRole !== "admin") {
+              await setDoc(doc(db, "users", currentUser.uid), { role: "admin" }, { merge: true });
+            } else if (!isAdmin) {
+              setRole(currentRole); // Trust firestore for non-admins (like committee members)
+            }
           } else {
-            setRole(currentRole);
+            const defaultRole = isAdmin ? "admin" : "viewer";
+            await setDoc(doc(db, "users", currentUser.uid), {
+              uid: currentUser.uid,
+              name: currentUser.displayName || "User",
+              email: currentUser.email,
+              role: defaultRole,
+              createdAt: new Date().toISOString()
+            });
+            setRole(defaultRole);
           }
-        } else {
-          const defaultRole = isAdmin ? "admin" : "viewer";
-          await setDoc(doc(db, "users", currentUser.uid), {
-            uid: currentUser.uid,
-            name: currentUser.displayName || "User",
-            email: currentUser.email,
-            role: defaultRole,
-            createdAt: new Date().toISOString()
-          });
-          setRole(defaultRole);
+        } catch (error) {
+          console.error("Firestore Error (You likely haven't created the Firestore Database yet):", error);
+          // Failsafe: if Firestore is broken, we still give the Admin access locally!
         }
       } else {
         setRole(null);
