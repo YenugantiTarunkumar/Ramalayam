@@ -66,6 +66,8 @@ const AdminPanel: React.FC = () => {
       return;
     }
     await updateDoc(doc(db, "users", userId), { role: newRole });
+    // Update local state instantly so a refresh isn't needed
+    setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -128,7 +130,10 @@ const AdminPanel: React.FC = () => {
             </thead>
             <tbody>
               {users.map(u => {
-                const isMasterAdmin = u.email === "tarunkummaryenuganti07@gmail.com";
+                const safeStoreEmail = u.email?.trim().toLowerCase() || "";
+                const isMasterAdmin = safeStoreEmail === "tarunkummaryenuganti07@gmail.com" || safeStoreEmail === "tarunkumaryenuganti07@gmail.com";
+                const isSelf = user?.uid === u.id; // Prevent a user from removing their own power
+
                 return (
                   <tr key={u.id}>
                     <td>{u.name}</td>
@@ -136,8 +141,8 @@ const AdminPanel: React.FC = () => {
                       <select 
                         value={u.role} 
                         onChange={(e) => handleUpdateRole(u.id, e.target.value)}
-                        disabled={isMasterAdmin}
-                        title={isMasterAdmin ? "Master Admin role cannot be changed" : ""}
+                        disabled={isMasterAdmin || isSelf}
+                        title={isMasterAdmin ? "Master Admin role cannot be changed" : isSelf ? "You cannot edit your own role" : ""}
                       >
                         <option value="viewer">Viewer</option>
                         <option value="committee">Committee</option>
@@ -146,7 +151,10 @@ const AdminPanel: React.FC = () => {
                     </td>
                     <td>
                       {!isMasterAdmin ? (
-                        <button onClick={() => handleDeleteUser(u.id)} className="btn-text danger">Delete</button>
+                        <>
+                          {!isSelf && <button onClick={() => handleDeleteUser(u.id)} className="btn-text danger">Delete</button>}
+                          {isSelf && <span className="badge cash_in">You</span>}
+                        </>
                       ) : (
                         <span className="badge cash_in">Master</span>
                       )}
