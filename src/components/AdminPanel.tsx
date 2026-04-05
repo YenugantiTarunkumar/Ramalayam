@@ -59,15 +59,22 @@ const AdminPanel: React.FC = () => {
   }, [role]);
 
   const handleUpdateRole = async (userId: string, newRole: string) => {
+    // Optimistic UI update for instant feedback
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    
     if (isDemoMode) {
       const updatedUsers = users.map(u => u.id === userId ? { ...u, role: newRole } : u);
-      setUsers(updatedUsers);
       localStorage.setItem("temple_demo_users_list", JSON.stringify(updatedUsers));
       return;
     }
-    await updateDoc(doc(db, "users", userId), { role: newRole });
-    // Update local state instantly so a refresh isn't needed
-    setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    
+    try {
+      await updateDoc(doc(db, "users", userId), { role: newRole });
+    } catch (error) {
+      console.error("Failed to update user role:", error);
+      // Revert if it fails
+      alert("Failed to update role in database.");
+    }
   };
 
   const handleDeleteUser = async (userId: string) => {
