@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { uploadVideo, getGalleryItems, deleteGalleryItem, GalleryItem } from "@/services/galleryService";
+import { uploadMedia, getGalleryItems, deleteGalleryItem, GalleryItem } from "@/services/galleryService";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaVideo, FaFolder, FaTrash, FaPlus, FaTimes } from "react-icons/fa";
+import { FaVideo, FaImage, FaFolder, FaTrash, FaPlus, FaTimes } from "react-icons/fa";
 
 const Gallery: React.FC = () => {
   const { role, user } = useAuth();
@@ -15,7 +15,8 @@ const Gallery: React.FC = () => {
   // Form State
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
-  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -29,22 +30,23 @@ const Gallery: React.FC = () => {
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!videoFile || !title || !category) return;
+    if (!mediaFile || !title || !category) return;
     setUploading(true);
 
     try {
-      await uploadVideo({
+      await uploadMedia({
         title,
+        type: mediaType,
         category,
         uploadedBy: user!.uid,
         uploadedByName: user!.displayName || user!.email || "User"
-      }, videoFile);
+      }, mediaFile);
       
       setShowUpload(false);
-      setTitle(""); setCategory(""); setVideoFile(null);
+      setTitle(""); setCategory(""); setMediaFile(null);
     } catch (err) {
       console.error(err);
-      alert("Failed to upload video");
+      alert("Failed to upload media");
     } finally {
       setUploading(false);
     }
@@ -62,7 +64,7 @@ const Gallery: React.FC = () => {
         </div>
         {isAdminOrCommittee && (
           <button className="btn-primary" onClick={() => setShowUpload(true)}>
-            <FaPlus /> Post Video
+            <FaPlus /> Post Media
           </button>
         )}
       </div>
@@ -89,10 +91,17 @@ const Gallery: React.FC = () => {
           >
             <div className="modal-content glass">
               <div className="modal-header">
-                <h3>Post New Event Video</h3>
+                <h3>Post New Event Media</h3>
                 <button className="btn-close" onClick={() => setShowUpload(false)}><FaTimes /></button>
               </div>
               <form onSubmit={handleUpload}>
+                <div className="input-group">
+                  <label>Media Type</label>
+                  <div className="type-toggle">
+                    <button type="button" className={mediaType === 'image' ? 'active' : ''} onClick={() => setMediaType('image')}><FaImage /> Image</button>
+                    <button type="button" className={mediaType === 'video' ? 'active' : ''} onClick={() => setMediaType('video')}><FaVideo /> Video</button>
+                  </div>
+                </div>
                 <div className="input-group">
                   <label>Event Title</label>
                   <input type="text" value={title} onChange={e => setTitle(e.target.value)} required placeholder="e.g. Maha Shivaratri 2024" />
@@ -102,11 +111,16 @@ const Gallery: React.FC = () => {
                   <input type="text" value={category} onChange={e => setCategory(e.target.value)} required placeholder="e.g. Festivals, Daily Puja" />
                 </div>
                 <div className="input-group">
-                  <label>Video File</label>
-                  <input type="file" accept="video/*" onChange={e => setVideoFile(e.target.files?.[0] || null)} required />
+                  <label>{mediaType === 'image' ? 'Image File' : 'Video File'}</label>
+                  <input 
+                    type="file" 
+                    accept={mediaType === 'image' ? 'image/*' : 'video/*'} 
+                    onChange={e => setMediaFile(e.target.files?.[0] || null)} 
+                    required 
+                  />
                 </div>
                 <button type="submit" className="btn-success full-width" disabled={uploading}>
-                  {uploading ? "Uploading..." : "Share Video"}
+                  {uploading ? "Uploading..." : `Share ${mediaType === 'image' ? 'Image' : 'Video'}`}
                 </button>
               </form>
             </div>
@@ -117,14 +131,18 @@ const Gallery: React.FC = () => {
       <div className="video-grid">
         {filteredItems.map(item => (
           <motion.div layout key={item.id} className="video-card glass">
-            <div className="video-wrapper">
-              <video src={item.videoUrl} controls poster={item.thumbnailUrl} />
+            <div className="media-wrapper">
+              {item.type === 'video' ? (
+                <video src={item.mediaUrl} controls />
+              ) : (
+                <img src={item.mediaUrl} alt={item.title} />
+              )}
             </div>
             <div className="video-info">
               <div className="vi-top">
                 <h4>{item.title}</h4>
                 {isAdminOrCommittee && (
-                  <button className="btn-icon-danger" onClick={() => deleteGalleryItem(item.id!, item.videoUrl)}>
+                  <button className="btn-icon-danger" onClick={() => deleteGalleryItem(item.id!, item.mediaUrl)}>
                     <FaTrash />
                   </button>
                 )}
@@ -158,8 +176,8 @@ const Gallery: React.FC = () => {
         
         .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
         .video-card { border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
-        .video-wrapper { width: 100%; aspect-ratio: 16/9; background: #000; }
-        .video-wrapper video { width: 100%; height: 100%; object-fit: contain; }
+        .media-wrapper { width: 100%; aspect-ratio: 16/9; background: #f0f0f0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .media-wrapper video, .media-wrapper img { width: 100%; height: 100%; object-fit: contain; }
         
         .video-info { padding: 15px; }
         .vi-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
@@ -176,6 +194,10 @@ const Gallery: React.FC = () => {
         .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
         .input-group label { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
         .input-group input { padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; }
+        
+        .type-toggle { display: flex; gap: 10px; }
+        .type-toggle button { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-muted); transition: all 0.2s; }
+        .type-toggle button.active { background: var(--primary); color: white; border-color: var(--primary); }
         
         .btn-primary { display: flex; align-items: center; gap: 8px; background: var(--primary); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .btn-success { background: var(--success); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; }

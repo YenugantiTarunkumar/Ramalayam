@@ -14,8 +14,9 @@ import { db, storage, isDemoMode } from "@/lib/firebase";
 export interface GalleryItem {
   id?: string;
   title: string;
-  videoUrl: string;
-  thumbnailUrl?: string; // Optional for now
+  type: 'video' | 'image';
+  mediaUrl: string;
+  thumbnailUrl?: string;
   category: string;
   timestamp: Date;
   uploadedBy: string;
@@ -24,15 +25,15 @@ export interface GalleryItem {
 
 const DEMO_GALLERY_KEY = "temple_demo_gallery";
 
-export const uploadVideo = async (
-  item: Omit<GalleryItem, 'id' | 'timestamp' | 'videoUrl'>,
-  videoFile: File
+export const uploadMedia = async (
+  item: Omit<GalleryItem, 'id' | 'timestamp' | 'mediaUrl'>,
+  file: File
 ) => {
   if (isDemoMode) {
     const newItem: GalleryItem = {
       ...item,
-      id: "demo_vid_" + Date.now(),
-      videoUrl: URL.createObjectURL(videoFile),
+      id: "demo_med_" + Date.now(),
+      mediaUrl: URL.createObjectURL(file),
       timestamp: new Date()
     };
     const existing = JSON.parse(localStorage.getItem(DEMO_GALLERY_KEY) || "[]");
@@ -41,14 +42,15 @@ export const uploadVideo = async (
   }
 
   // 1. Upload to Storage
-  const storageRef = ref(storage, `gallery/videos/${Date.now()}_${videoFile.name}`);
-  const snapshot = await uploadBytes(storageRef, videoFile);
-  const videoUrl = await getDownloadURL(snapshot.ref);
+  const folder = item.type === 'video' ? 'videos' : 'images';
+  const storageRef = ref(storage, `gallery/${folder}/${Date.now()}_${file.name}`);
+  const snapshot = await uploadBytes(storageRef, file);
+  const mediaUrl = await getDownloadURL(snapshot.ref);
 
   // 2. Save Metadata to Firestore
   return await addDoc(collection(db, "gallery"), {
     ...item,
-    videoUrl,
+    mediaUrl,
     timestamp: Timestamp.now()
   });
 };
@@ -74,7 +76,7 @@ export const getGalleryItems = (callback: (items: GalleryItem[]) => void) => {
   });
 };
 
-export const deleteGalleryItem = async (id: string, videoUrl: string) => {
+export const deleteGalleryItem = async (id: string, mediaUrl: string) => {
   if (isDemoMode) {
     const existing = JSON.parse(localStorage.getItem(DEMO_GALLERY_KEY) || "[]");
     localStorage.setItem(DEMO_GALLERY_KEY, JSON.stringify(existing.filter((i: any) => i.id !== id)));
@@ -86,8 +88,8 @@ export const deleteGalleryItem = async (id: string, videoUrl: string) => {
 
   // Delete from Storage if possible
   try {
-    const videoRef = ref(storage, videoUrl);
-    await deleteObject(videoRef);
+    const mediaRef = ref(storage, mediaUrl);
+    await deleteObject(mediaRef);
   } catch (err) {
     console.error("Storage delete failed:", err);
   }
