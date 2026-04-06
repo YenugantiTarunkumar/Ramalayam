@@ -138,3 +138,112 @@ p, span, label, td, th {
 .fade-in {
   animation: fadeIn 0.5s ease-out forwards;
 }
+
+/* ============================================================
+   GLOBAL DARK-THEME OVERRIDES
+   These ensure ALL components are readable against the temple
+   background image, overriding any component-level inline styles.
+============================================================ */
+
+/* Force all text inside glass cards to be white */
+.glass h1, .glass h2, .glass h3, .glass h4,
+.glass p, .glass span, .glass label,
+.glass-dark h1, .glass-dark h2, .glass-dark h3, .glass-dark h4,
+.glass-dark p, .glass-dark span {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+/* Exception: saffron gradient headings */
+.text-saffron-gradient {
+  background: linear-gradient(135deg, #FF9933, #FFCC66) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+}
+
+/* Card headings should be saffron */
+.glass h3, .glass-dark h3, .glass h2, .glass-dark h2 {
+  color: var(--primary) !important;
+  -webkit-text-fill-color: var(--primary) !important;
+}
+
+/* All containers sit above the overlay */
+div, section, main, header, nav, form {
+  position: relative;
+  z-index: 1;
+}
+
+/* Form inputs — white text on dark transparent backgrounds */
+input:not([type="submit"]):not([type="button"]):not([type="checkbox"]),
+select,
+textarea {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 8px !important;
+}
+input::placeholder, textarea::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+select option {
+  background: #1a0a00 !important;
+  color: #fff !important;
+}
+/* Date picker calendar icon */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
+/* Tables */
+table { color: #fff !important; }
+thead th { color: var(--primary) !important; -webkit-text-fill-color: var(--primary) !important; background: rgba(255,255,255,0.05) !important; }
+tbody td { color: rgba(255,255,255,0.9) !important; -webkit-text-fill-color: rgba(255,255,255,0.9) !important; border-bottom: 1px solid rgba(255,255,255,0.06) !important; }
+tbody tr:hover td { background: rgba(255,153,51,0.05) !important; }
+
+/* Status badges — keep their colors but ensure text is readable */
+.badge, [class*="badge"], [class*="status"] {
+  text-shadow: none !important;
+}
+
+/* White-background cards that are hardcoded in components */
+/* Override any white/light card backgrounds */
+[style*="background: white"],
+[style*="background-color: white"],
+[style*="background: #fff"],
+[style*="background-color: #fff"] {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Buttons that had white background + dark text */
+button.btn-secondary,
+button[class*="secondary"] {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+button.btn-secondary:hover {
+  background: rgba(255, 153, 51, 0.2) !important;
+  color: var(--primary) !important;
+}
+
+/* Muted text should be off-white, not grey */
+.text-muted, [class*="muted"], [class*="sub"],
+.msg-date, .meta, .subtitle {
+  color: rgba(255, 255, 255, 0.6) !important;
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Ledger/Transaction list rows */
+.transaction-item, .ledger-row, [class*="transaction"],
+.message-card, .card, [class*="-card"] {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+
+/* Amount values — keep income green, expenses red */
+.amount-in, [class*="cash_in"] { color: #4caf50 !important; -webkit-text-fill-color: #4caf50 !important; }
+.amount-out, [class*="cash_out"] { color: #ff6b6b !important; -webkit-text-fill-color: #ff6b6b !important; }
+
