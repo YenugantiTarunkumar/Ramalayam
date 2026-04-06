@@ -7,6 +7,8 @@ import {
   getTransactions, 
   approveTransaction, 
   rejectTransaction, 
+  addTransaction,
+  calculatePersonalBalance,
   Transaction 
 } from "@/services/transactionService";
 import { 
@@ -18,48 +20,81 @@ import {
 } from "firebase/firestore";
 import { db, isDemoMode } from "@/lib/firebase";
 import { generateTransactionReport } from "@/utils/pdfGenerator";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { FaExclamationCircle, FaHandHoldingUsd } from "react-icons/fa";
 
 const AdminPanel: React.FC = () => {
   const { user, role } = useAuth();
   const { t } = useTranslation();
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-  const [dateRange, setDateRange] = useState({ start: "", end: "" });
+  const [overspentUsers, setOverspentUsers] = useState<any[]>([]);
 
   useEffect(() => {
     if (role !== "admin") return;
 
-    // Fetch pending transactions
+    // Fetch transactions
     const unsubscribe = getTransactions((all) => {
+      setAllTransactions(all);
       setPendingTransactions(all.filter(t => t.status === "pending"));
     });
 
     // Fetch users
     const fetchUsers = async () => {
+      let fetchedUsers: any[] = [];
       if (isDemoMode) {
-        let storedUsers = JSON.parse(localStorage.getItem("temple_demo_users_list") || "[]");
-        if (storedUsers.length === 0) {
-          storedUsers = [
-            { id: "demo_1", name: "Tarun Kumar", role: "admin", email: "tarunkummaryenuganti07@gmail.com" },
-            { id: "demo_2", name: "Committee Member", role: "committee", email: "committee@temple.com" },
-            { id: "demo_3", name: "General User", role: "viewer", email: "user@temple.com" }
-          ];
-          localStorage.setItem("temple_demo_users_list", JSON.stringify(storedUsers));
-        }
-        setUsers(storedUsers);
-        return;
+        fetchedUsers = JSON.parse(localStorage.getItem("temple_demo_users_list") || "[]");
+      } else {
+        const snapshot = await getDocs(collection(db, "users"));
+        fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
-      const snapshot = await getDocs(collection(db, "users"));
-      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setUsers(fetchedUsers);
     };
 
     fetchUsers();
     return () => unsubscribe();
   }, [role]);
 
+  // Update overspent users whenever transactions or users change
+  useEffect(() => {
+    if (users.length > 0 && allTransactions.length > 0) {
+      const overspent = users
+        .filter(u => u.role === 'admin' || u.role === 'committee')
+        .map(u => {
+          const stats = calculatePersonalBalance(u.id, allTransactions);
+          return { ...u, stats };
+        })
+        .filter(u => u.stats.balanceLeft < 0);
+      setOverspentUsers(overspent);
+    }
+  }, [users, allTransactions]);
+
+  const handleSettleReimbursement = async (targetUser: any) => {
+    const amount = Math.abs(targetUser.stats.balanceLeft);
+    if (!confirm(`Settle reimbursement of ₹${amount} for ${targetUser.name}?`)) return;
+
+    try {
+      await addTransaction({
+        type: 'allocation',
+        amount: amount,
+        category: "Reimbursement",
+        description: `Reimbursement for extra expenses spent by ${targetUser.name}`,
+        status: 'settled_reimbursement',
+        submittedBy: user!.uid,
+        submittedByName: user!.displayName || user!.email || "Admin",
+        allocatedTo: targetUser.id,
+        allocatedToName: targetUser.name
+      });
+      alert("Reimbursement settled. Waiting for member to confirm receipt.");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to settle reimbursement");
+    }
+  };
+
   const handleUpdateRole = async (userId: string, newRole: string) => {
-    // Optimistic UI update for instant feedback
+    // Optimistic UI update
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     
     if (isDemoMode) {
@@ -72,7 +107,6 @@ const AdminPanel: React.FC = () => {
       await updateDoc(doc(db, "users", userId), { role: newRole });
     } catch (error) {
       console.error("Failed to update user role:", error);
-      // Revert if it fails
       alert("Failed to update role in database.");
     }
   };
@@ -80,9 +114,9 @@ const AdminPanel: React.FC = () => {
   const handleDeleteUser = async (userId: string) => {
     if (confirm("Are you sure?")) {
       if (isDemoMode) {
-        const filteredUsers = users.filter(u => u.id !== userId);
-        setUsers(filteredUsers);
-        localStorage.setItem("temple_demo_users_list", JSON.stringify(filteredUsers));
+        setUsers(prev => prev.filter(u => u.id !== userId));
+        const current = JSON.parse(localStorage.getItem("temple_demo_users_list") || "[]");
+        localStorage.setItem("temple_demo_users_list", JSON.stringify(current.filter((u: any) => u.id !== userId)));
         return;
       }
       await deleteDoc(doc(db, "users", userId));
@@ -95,6 +129,37 @@ const AdminPanel: React.FC = () => {
   return (
     <div className="admin-container fade-in">
       <h2>{t('adminPanel')}</h2>
+
+      {/* Overspent Members Notification */}
+      <AnimatePresence>
+        {overspentUsers.length > 0 && (
+          <motion.section 
+            initial={{ height: 0, opacity: 0 }} 
+            animate={{ height: 'auto', opacity: 1 }} 
+            className="admin-section overspent-section glass"
+          >
+            <div className="section-header danger">
+              <FaExclamationCircle /> <h3>Overspent Members (Needs Reimbursement)</h3>
+            </div>
+            <div className="overspent-list">
+              {overspentUsers.map(u => (
+                <div key={u.id} className="overspent-card glass-dark">
+                  <div className="oc-info">
+                    <strong>{u.name}</strong>
+                    <span className="text-danger">Extra Spent: ₹{Math.abs(u.stats.balanceLeft)}</span>
+                  </div>
+                  <button 
+                    className="btn-success btn-sm" 
+                    onClick={() => handleSettleReimbursement(u)}
+                  >
+                    <FaHandHoldingUsd /> Settle Extra
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.section>
+        )}
+      </AnimatePresence>
 
       {/* Approval Queue */}
       <section className="admin-section">
@@ -139,7 +204,7 @@ const AdminPanel: React.FC = () => {
               {users.map(u => {
                 const safeStoreEmail = u.email?.trim().toLowerCase() || "";
                 const isMasterAdmin = safeStoreEmail === "tarunkummaryenuganti07@gmail.com" || safeStoreEmail === "tarunkumaryenuganti07@gmail.com";
-                const isSelf = user?.uid === u.id; // Prevent a user from removing their own power
+                const isSelf = user?.uid === u.id;
 
                 return (
                   <tr key={u.id}>
@@ -149,7 +214,6 @@ const AdminPanel: React.FC = () => {
                         value={u.role} 
                         onChange={(e) => handleUpdateRole(u.id, e.target.value)}
                         disabled={isMasterAdmin || isSelf}
-                        title={isMasterAdmin ? "Master Admin role cannot be changed" : isSelf ? "You cannot edit your own role" : ""}
                       >
                         <option value="viewer">Viewer</option>
                         <option value="committee">Committee</option>
@@ -178,6 +242,12 @@ const AdminPanel: React.FC = () => {
         .admin-container { padding-bottom: 50px; }
         h2 { margin-bottom: 30px; }
         .admin-section { margin-bottom: 40px; }
+        .overspent-section { border-left: 5px solid var(--error); padding: 25px; margin-bottom: 30px; background: rgba(255, 82, 82, 0.05); }
+        .section-header.danger { display: flex; align-items: center; gap: 10px; color: var(--error); margin-bottom: 20px; }
+        .overspent-list { display: flex; flex-direction: column; gap: 15px; }
+        .overspent-card { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-radius: 10px; border-left: 4px solid var(--error); }
+        .oc-info { display: flex; flex-direction: column; gap: 4px; }
+        .btn-sm { padding: 6px 12px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
         .transaction-card { padding: 20px; }
         .tr-header { display: flex; justify-content: space-between; margin-bottom: 10px; }

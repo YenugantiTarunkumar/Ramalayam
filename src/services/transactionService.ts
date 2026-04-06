@@ -20,7 +20,7 @@ export interface Transaction {
   category: string;
   
   // New workflow statuses
-  status: 'pending' | 'approved' | 'rejected' | 'pending_submission' | 'submitted_to_admin' | 'pending_settlement' | 'settled_by_admin' | 'received_confirmed';
+  status: 'pending' | 'approved' | 'rejected' | 'pending_submission' | 'submitted_to_admin' | 'pending_settlement' | 'settled_by_admin' | 'received_confirmed' | 'settled_reimbursement';
   
   // Recipient for allocations
   allocatedTo?: string;
@@ -175,7 +175,7 @@ export const calculateBalance = async () => {
     const existing = JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY) || "[]");
     let balance = 0;
     existing.forEach((t: any) => {
-      if (t.status === 'approved' || t.status === 'received_confirmed' || t.status === 'settled_by_admin') {
+      if (t.status === 'approved' || t.status === 'received_confirmed' || t.status === 'settled_by_admin' || t.status === 'settled_reimbursement') {
         if (t.type === 'cash_in') balance += (t.amount || 0);
         else if (t.type === 'cash_out' || t.type === 'allocation') balance -= (t.amount || 0);
       }
@@ -188,7 +188,7 @@ export const calculateBalance = async () => {
   let balance = 0;
   snapshot.forEach(doc => {
     const data = doc.data();
-    if (data.status === 'approved' || data.status === 'received_confirmed' || data.status === 'settled_by_admin') {
+    if (data.status === 'approved' || data.status === 'received_confirmed' || data.status === 'settled_by_admin' || data.status === 'settled_reimbursement') {
       if (data.type === 'cash_in') {
         balance += (data.amount || 0);
       } else if (data.type === 'cash_out' || data.type === 'allocation') {
@@ -211,7 +211,10 @@ export const calculatePersonalBalance = (uid: string, allTransactions: Transacti
   allTransactions.forEach(t => {
     // 1. Sum money allocated TO the user
     if (t.type === 'allocation' && t.allocatedTo === uid) {
-      totalAllocated += t.amount;
+      // Include approved and settled reimbursements as part of the total allocated
+      if (t.status === 'approved' || t.status === 'received_confirmed' || t.status === 'settled_reimbursement') {
+        totalAllocated += t.amount;
+      }
     }
 
     // 2. Track user's expenditures
