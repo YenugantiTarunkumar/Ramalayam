@@ -15,13 +15,17 @@ import { db, storage, isDemoMode } from "@/lib/firebase";
 
 export interface Transaction {
   id?: string;
-  type: 'cash_in' | 'cash_out';
+  type: 'cash_in' | 'cash_out' | 'allocation';
   amount: number;
   category: string;
   
   // New workflow statuses
   status: 'pending' | 'approved' | 'rejected' | 'pending_submission' | 'submitted_to_admin' | 'pending_settlement' | 'settled_by_admin' | 'received_confirmed';
   
+  // Recipient for allocations
+  allocatedTo?: string;
+  allocatedToName?: string;
+
   // New donor tracking fields
   donorType?: 'myself' | 'others';
   forWhom?: string;
@@ -171,9 +175,9 @@ export const calculateBalance = async () => {
     const existing = JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY) || "[]");
     let balance = 0;
     existing.forEach((t: any) => {
-      if (t.status === 'approved' || t.status === 'received_confirmed') {
+      if (t.status === 'approved' || t.status === 'received_confirmed' || t.status === 'settled_by_admin') {
         if (t.type === 'cash_in') balance += (t.amount || 0);
-        else balance -= (t.amount || 0);
+        else if (t.type === 'cash_out' || t.type === 'allocation') balance -= (t.amount || 0);
       }
     });
     return balance;
@@ -184,14 +188,49 @@ export const calculateBalance = async () => {
   let balance = 0;
   snapshot.forEach(doc => {
     const data = doc.data();
-    if (data.status === 'approved' || data.status === 'received_confirmed') {
+    if (data.status === 'approved' || data.status === 'received_confirmed' || data.status === 'settled_by_admin') {
       if (data.type === 'cash_in') {
         balance += (data.amount || 0);
-      } else {
+      } else if (data.type === 'cash_out' || data.type === 'allocation') {
         balance -= (data.amount || 0);
       }
     }
   });
   
   return balance;
+};
+
+// --- New Service for "My Cash" ---
+
+export const calculatePersonalBalance = (uid: string, allTransactions: Transaction[]) => {
+  let totalAllocated = 0;
+  let pendingExpenses = 0;
+  let totalExpenses = 0;
+  let approvedExpenses = 0;
+
+  allTransactions.forEach(t => {
+    // 1. Sum money allocated TO the user
+    if (t.type === 'allocation' && t.allocatedTo === uid) {
+      totalAllocated += t.amount;
+    }
+
+    // 2. Track user's expenditures
+    if (t.type === 'cash_out' && t.submittedBy === uid) {
+      totalExpenses += t.amount;
+      
+      // Expenses not yet finalized (received_confirmed) are considered "pending" for personal balance
+      if (t.status !== 'received_confirmed') {
+        pendingExpenses += t.amount;
+      } else {
+        approvedExpenses += t.amount;
+      }
+    }
+  });
+
+  return {
+    allocated: totalAllocated,
+    pending: pendingExpenses,
+    balanceLeft: totalAllocated - totalExpenses, // All logged expenses deducted
+    finalBalance: totalAllocated - approvedExpenses // Only finalized expenses deducted
+  };
 };

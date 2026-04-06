@@ -3,26 +3,40 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getTransactions, addTransaction, updateTransactionStatus, Transaction } from "@/services/transactionService";
+import { db, isDemoMode } from "@/lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
 import { motion, AnimatePresence } from "framer-motion";
 
 const CashWorkspace: React.FC = () => {
   const { role, user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'collected' | 'spent'>('collected');
+  const [activeTab, setActiveTab] = useState<'collected' | 'spent' | 'allocations'>('collected');
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
 
   // Form State
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
+  const [targetUser, setTargetUser] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const unsubscribe = getTransactions((all) => {
-      // Filter out pure "donations" made through the viewer portal if needed,
-      // but assuming everything has type cash_in / cash_out
       setAllTransactions(all);
     });
+
+    const fetchUsers = async () => {
+      if (isDemoMode) {
+        let storedUsers = JSON.parse(localStorage.getItem("temple_demo_users_list") || "[]");
+        setUsers(storedUsers);
+        return;
+      }
+      const snapshot = await getDocs(collection(db, "users"));
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    };
+
+    fetchUsers();
     return () => unsubscribe();
   }, []);
 
@@ -31,35 +45,56 @@ const CashWorkspace: React.FC = () => {
   // Filter based on Role and Tab
   const relevantTransactions = allTransactions.filter(tr => {
     // Basic filter for type
-    const matchesTab = activeTab === 'collected' ? tr.type === 'cash_in' : tr.type === 'cash_out';
+    const matchesTab = 
+      activeTab === 'collected' ? tr.type === 'cash_in' : 
+      activeTab === 'spent' ? tr.type === 'cash_out' :
+      tr.type === 'allocation';
+      
     if (!matchesTab) return false;
     
     // Role visibility
     if (isAdmin) return true;
-    return tr.submittedBy === user?.uid;
+    
+    // User sees their own logged items
+    if (tr.submittedBy === user?.uid) return true;
+    
+    // For allocations, the recipient should also see them in this list?
+    // Actually "My Cash" handles that better, but let's show them here too if they are the recipient
+    if (tr.type === 'allocation' && tr.allocatedTo === user?.uid) return true;
+    
+    return false;
   });
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !description) return;
+    if (activeTab === 'allocations' && !targetUser) return;
     setSubmitting(true);
 
     try {
-      const type = activeTab === 'collected' ? 'cash_in' : 'cash_out';
-      const initialStatus = type === 'cash_in' ? 'pending_submission' : 'pending_settlement';
+      const type = activeTab === 'collected' ? 'cash_in' : activeTab === 'spent' ? 'cash_out' : 'allocation';
+      let initialStatus: Transaction['status'] = 'pending';
+      
+      if (type === 'cash_in') initialStatus = 'pending_submission';
+      else if (type === 'cash_out') initialStatus = 'pending_settlement';
+      else if (type === 'allocation') initialStatus = 'approved'; // Allocations by Admin are auto-approved
+
+      const targetUserData = users.find(u => u.id === targetUser);
 
       await addTransaction({
         type,
         amount: parseFloat(amount),
-        category: category || "General",
+        category: category || (type === 'allocation' ? "Fund Allocation" : "General"),
         description,
         status: initialStatus,
         submittedBy: user!.uid,
-        submittedByName: user!.displayName || user!.email || "User"
+        submittedByName: user!.displayName || user!.email || "User",
+        allocatedTo: targetUser || undefined,
+        allocatedToName: targetUserData?.name || undefined
       });
 
       setShowForm(false);
-      setAmount(""); setCategory(""); setDescription("");
+      setAmount(""); setCategory(""); setDescription(""); setTargetUser("");
     } catch (err) {
       console.error(err);
       alert("Failed to record entry");
@@ -83,36 +118,65 @@ const CashWorkspace: React.FC = () => {
           <button className={activeTab === 'spent' ? 'active' : ''} onClick={() => { setActiveTab('spent'); setShowForm(false); }}>
             Spent (Cash Out)
           </button>
+          {isAdmin && (
+            <button className={activeTab === 'allocations' ? 'active' : ''} onClick={() => { setActiveTab('allocations'); setShowForm(false); }}>
+              Allocations
+            </button>
+          )}
         </div>
       </div>
 
       <div className="cw-actions">
         {!showForm && (
           <button className="btn-primary" onClick={() => setShowForm(true)}>
-            + Log New {activeTab === 'collected' ? 'Collection' : 'Expense'}
+            + Log New {activeTab === 'collected' ? 'Collection' : activeTab === 'spent' ? 'Expense' : 'Allocation'}
           </button>
         )}
       </div>
 
       {showForm && (
         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="form-card glass">
-          <h3>Register {activeTab === 'collected' ? 'Collected Money' : 'Spent Money'}</h3>
+          <h3>
+            {activeTab === 'collected' ? 'Register Collected Money' : 
+             activeTab === 'spent' ? 'Register Spent Money' : 
+             'Allocate Money to Member'}
+          </h3>
           <form onSubmit={handleAddSubmit}>
-            <div className="input-group">
-              <label>Amount (₹)</label>
-              <input type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="1" />
+            <div className="input-row">
+              <div className="input-group">
+                <label>Amount (₹)</label>
+                <input type="number" value={amount} onChange={e => setAmount(e.target.value)} required min="1" />
+              </div>
+              
+              {activeTab === 'allocations' && (
+                <div className="input-group">
+                  <label>Assign To</label>
+                  <select value={targetUser} onChange={e => setTargetUser(e.target.value)} required>
+                    <option value="">Select Member</option>
+                    {users.filter(u => u.id !== user?.uid).map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
+
+            {activeTab !== 'allocations' && (
+              <div className="input-group">
+                <label>Category</label>
+                <input type="text" value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Extra Hundi, Supplies" required />
+              </div>
+            )}
+            
             <div className="input-group">
-              <label>Category</label>
-              <input type="text" value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Extra Hundi, Supplies" required />
-            </div>
-            <div className="input-group">
-              <label>Description</label>
+              <label>Description / Reason</label>
               <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} required />
             </div>
             <div className="form-footer">
               <button type="button" className="btn-text" onClick={() => setShowForm(false)}>Cancel</button>
-              <button type="submit" className="btn-success" disabled={submitting}>Save Draft</button>
+              <button type="submit" className="btn-success" disabled={submitting}>
+                {activeTab === 'allocations' ? 'Confirm Allocation' : 'Save Draft'}
+              </button>
             </div>
           </form>
         </motion.div>
@@ -206,7 +270,8 @@ const CashWorkspace: React.FC = () => {
         .form-card h3 { margin-bottom: 20px; color: var(--accent); }
         .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 15px; }
         .input-group label { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
-        .input-group input, .input-group textarea { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit;}
+        .input-group input, .input-group textarea, .input-group select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; font-size: 1rem;}
+        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .form-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
         
         .transactions-list { display: flex; flex-direction: column; gap: 15px; }

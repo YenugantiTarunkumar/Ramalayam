@@ -15,6 +15,8 @@ import Feedback from "./Feedback";
 import PujaBrowser from "./PujaBrowser";
 import AnnouncementsBoard from "./AnnouncementsBoard";
 import CashWorkspace from "./CashWorkspace";
+import Gallery from "./Gallery";
+import MyCash from "./MyCash";
 import { isDemoMode } from "@/lib/firebase";
 
 const Dashboard: React.FC = () => {
@@ -22,7 +24,7 @@ const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [balance, setBalance] = useState(0);
   const [showForm, setShowForm] = useState(false);
-  const [activeTab, setActiveTab] = useState<'home' | 'ledger' | 'puja' | 'admin' | 'feedback' | 'cash_workspace'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'ledger' | 'puja' | 'admin' | 'feedback' | 'cash_workspace' | 'gallery' | 'my_cash'>('home');
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [dateRange, setDateRange] = useState({ 
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0], 
@@ -77,6 +79,7 @@ const Dashboard: React.FC = () => {
           <nav className="main-nav">
             <button className={activeTab === 'home' ? 'active' : ''} onClick={() => setActiveTab('home')}>{t('dashboard')}</button>
             <button className={activeTab === 'ledger' ? 'active' : ''} onClick={() => setActiveTab('ledger')}>{t('ledger')}</button>
+            <button className={activeTab === 'gallery' ? 'active' : ''} onClick={() => setActiveTab('gallery')}>Gallery</button>
             <button className={activeTab === 'puja' ? 'active' : ''} onClick={() => setActiveTab('puja')}>Pujas</button>
             {role === 'admin' && (
               <button className={activeTab === 'admin' ? 'active' : ''} onClick={() => setActiveTab('admin')}>{t('adminPanel')}</button>
@@ -113,10 +116,13 @@ const Dashboard: React.FC = () => {
                   <h3>{t('quickActions')}</h3>
                   <div className="action-buttons">
                     {(role === 'admin' || role === 'committee') && (
-                      <button className="btn-secondary" onClick={() => setActiveTab('cash_workspace')}>Cash Workspace</button>
+                      <>
+                        <button className="btn-secondary" onClick={() => setActiveTab('my_cash')}>My Cash</button>
+                        <button className="btn-secondary" onClick={() => setActiveTab('cash_workspace')}>Cash Workspace</button>
+                      </>
                     )}
                     <button className="btn-primary" onClick={() => setShowForm(true)}>Donate</button>
-                    <button className="btn-primary" onClick={() => setActiveTab('puja')}>Pujas</button>
+                    <button className="btn-secondary" onClick={() => setActiveTab('gallery')}>Gallery</button>
                   </div>
                 </div>
               </div>
@@ -148,6 +154,8 @@ const Dashboard: React.FC = () => {
           {activeTab === 'cash_workspace' && <motion.div key="cash_workspace" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><CashWorkspace /></motion.div>}
           {activeTab === 'admin' && <motion.div key="admin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><AdminPanel /></motion.div>}
           {activeTab === 'feedback' && <motion.div key="feedback" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Feedback /></motion.div>}
+          {activeTab === 'gallery' && <motion.div key="gallery" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Gallery /></motion.div>}
+          {activeTab === 'my_cash' && <motion.div key="my_cash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><MyCash /></motion.div>}
         </AnimatePresence>
       </main>
 
