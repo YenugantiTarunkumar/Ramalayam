@@ -221,8 +221,11 @@ export const calculatePersonalBalance = (uid: string, allTransactions: Transacti
     if (t.type === 'cash_out' && t.submittedBy === uid) {
       totalExpenses += t.amount;
       
-      // Expenses not yet finalized (received_confirmed) are considered "pending" for personal balance
-      if (t.status !== 'received_confirmed') {
+      // Finalized = Admin has approved OR it has been fully settled/confirmed
+      // When Admin approves, it should IMMEDIATELY deduct from final balance
+      const isFinalized = t.status === 'approved' || t.status === 'received_confirmed' || t.status === 'settled_by_admin';
+      
+      if (!isFinalized) {
         pendingExpenses += t.amount;
       } else {
         approvedExpenses += t.amount;

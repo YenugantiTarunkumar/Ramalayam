@@ -37,7 +37,13 @@ const AdminPanel: React.FC = () => {
     // Fetch transactions
     const unsubscribe = getTransactions((all) => {
       setAllTransactions(all);
-      setPendingTransactions(all.filter(t => t.status === "pending"));
+      // Show all transactions that need Admin action:
+      // - pending_settlement: member logged an expense, needs Admin to approve
+      // - pending_submission: member logged cash collected, needs Admin to confirm
+      // - submitted_to_admin: member submitted receipts for review
+      // - pending: generic fallback
+      const needsAction = ['pending', 'pending_settlement', 'pending_submission', 'submitted_to_admin'];
+      setPendingTransactions(all.filter(t => needsAction.includes(t.status)));
     });
 
     // Fetch users
@@ -168,10 +174,14 @@ const AdminPanel: React.FC = () => {
           {pendingTransactions.map(tr => (
             <div key={tr.id} className="glass transaction-card">
               <div className="tr-header">
-                <span className={`badge ${tr.type}`}>{tr.type}</span>
+                <span className={`badge ${tr.type}`}>{tr.type.replace('_', ' ')}</span>
                 <span className="tr-amount">₹ {tr.amount}</span>
               </div>
               <p className="tr-desc">{tr.description}</p>
+              <div className="tr-meta">
+                <span>By: <strong>{tr.submittedByName}</strong></span>
+                <span className={`status-pill ${tr.status}`}>{tr.status.replace(/_/g, ' ')}</span>
+              </div>
               <div className="tr-footer">
                 <button 
                   onClick={() => approveTransaction(tr.id!, user!.uid)}
@@ -255,7 +265,10 @@ const AdminPanel: React.FC = () => {
         .badge { font-size: 0.7rem; text-transform: uppercase; padding: 2px 8px; border-radius: 10px; }
         .cash_in { background: #e8f5e9; color: var(--success); }
         .cash_out { background: #ffebee; color: var(--error); }
-        .tr-footer { display: flex; gap: 10px; margin-top: 15px; }
+        .tr-desc { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px; }
+        .tr-meta { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px; }
+        .status-pill { padding: 2px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; background: #fff3e0; color: #e65100; }
+        .tr-footer { display: flex; gap: 10px; margin-top: 5px; }
         .btn-success { background: var(--success); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
         .btn-danger { background: var(--error); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
         .user-table { width: 100%; overflow-x: auto; padding: 20px; }
