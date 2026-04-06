@@ -14,6 +14,8 @@ export interface Announcement {
   id?: string;
   title: string;
   details: string;
+  titleTe?: string;
+  detailsTe?: string;
   createdAt?: Date;
 }
 

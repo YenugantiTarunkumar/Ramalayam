@@ -33,10 +33,21 @@ export const translations = {
       noTransactions: "No transactions found",
       generateReport: "Generate PDF Report",
       rating: "Rating",
+      showPassword: "Show Password",
       pujas: {
         abhishekam: "Abhishekam",
         archana: "Archana",
         kalyanam: "Kalyanam"
+      },
+      announcements: {
+        board: "Announcements Board",
+        titleEn: "Title (English)",
+        titleTe: "Title (Telugu)",
+        detailsEn: "Details (English)",
+        detailsTe: "Details (Telugu)",
+        post: "Post Announcement",
+        new: "New",
+        empty: "No active announcements."
       }
     }
   },
@@ -74,10 +85,21 @@ export const translations = {
       noTransactions: "లావాదేవీలు ఏవీ లేవు",
       generateReport: "PDF నివేదికను రూపొందించండి",
       rating: "రేటింగ్",
+      showPassword: "పాస్వర్డ్ చూపించు",
       pujas: {
         abhishekam: "అభిషేకం",
         archana: "అర్చన",
         kalyanam: "కళ్యాణం"
+      },
+      announcements: {
+        board: "ప్రకటనల బోర్డు",
+        titleEn: "శీర్షిక (ఇంగ్లీష్)",
+        titleTe: "శీర్షిక (తెలుగు)",
+        detailsEn: "వివరాలు (ఇంగ్లీష్)",
+        detailsTe: "వివరాలు (తెలుగు)",
+        post: "ప్రకటనను పోస్ట్ చేయండి",
+        new: "కొత్తది",
+        empty: "ప్రకటనలు ఏవీ లేవు."
       }
     }
   }
