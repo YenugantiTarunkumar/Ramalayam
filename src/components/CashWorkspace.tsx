@@ -67,6 +67,7 @@ const CashWorkspace: React.FC = () => {
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) { alert("You must be logged in to record entries."); return; }
     if (!amount || !description) return;
     if (activeTab === 'allocations' && !targetUser) return;
     setSubmitting(true);
@@ -77,9 +78,12 @@ const CashWorkspace: React.FC = () => {
       
       if (type === 'cash_in') initialStatus = 'pending_submission';
       else if (type === 'cash_out') initialStatus = 'pending_settlement';
-      else if (type === 'allocation') initialStatus = 'approved'; // Allocations by Admin are auto-approved
+      else if (type === 'allocation') initialStatus = 'approved';
 
       const targetUserData = users.find(u => u.id === targetUser);
+
+      // Safely resolve display name — Firebase email/password users often have null displayName
+      const submitterName = user.displayName || user.email || user.uid;
 
       await addTransaction({
         type,
@@ -87,17 +91,16 @@ const CashWorkspace: React.FC = () => {
         category: category || (type === 'allocation' ? "Fund Allocation" : "General"),
         description,
         status: initialStatus,
-        submittedBy: user!.uid,
-        submittedByName: user!.displayName || user!.email || "User",
-        allocatedTo: targetUser || undefined,
-        allocatedToName: targetUserData?.name || undefined
+        submittedBy: user.uid,
+        submittedByName: submitterName,
+        ...(targetUser ? { allocatedTo: targetUser, allocatedToName: targetUserData?.name || targetUser } : {})
       });
 
       setShowForm(false);
       setAmount(""); setCategory(""); setDescription(""); setTargetUser("");
-    } catch (err) {
-      console.error(err);
-      alert("Failed to record entry");
+    } catch (err: any) {
+      console.error("addTransaction error:", err?.message || err);
+      alert(`Failed to record entry: ${err?.message || 'Unknown error. Check console.'}`);
     } finally {
       setSubmitting(false);
     }

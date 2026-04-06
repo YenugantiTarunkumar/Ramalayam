@@ -61,13 +61,13 @@ const TransactionForm: React.FC<Props> = ({ onSuccess, onCancel }) => {
         description: donationType === 'cash' ? "Cash Donation" : "In-kind Donation",
         status: 'approved', // Real donations auto-finalize to ledger
         submittedBy: user!.uid,
-        submittedByName: user!.displayName || user!.email || "User"
+        submittedByName: user?.displayName || user?.email || user?.uid || "User"
       });
       
       onSuccess();
-    } catch (error) {
-      console.error(error);
-      alert("Submission failed");
+    } catch (error: any) {
+      console.error("TransactionForm error:", error?.message || error);
+      alert(`Submission failed: ${error?.message || 'Unknown error. Check console.'}`);
     } finally {
       setSubmitting(false);
     }

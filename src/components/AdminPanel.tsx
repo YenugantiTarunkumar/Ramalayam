@@ -82,7 +82,7 @@ const AdminPanel: React.FC = () => {
         description: `Reimbursement for extra expenses spent by ${targetUser.name}`,
         status: 'settled_reimbursement',
         submittedBy: user!.uid,
-        submittedByName: user!.displayName || user!.email || "Admin",
+        submittedByName: user?.displayName || user?.email || user?.uid || "Admin",
         allocatedTo: targetUser.id,
         allocatedToName: targetUser.name
       });

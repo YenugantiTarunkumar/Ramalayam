@@ -39,7 +39,7 @@ const Gallery: React.FC = () => {
         type: mediaType,
         category,
         uploadedBy: user!.uid,
-        uploadedByName: user!.displayName || user!.email || "User"
+        uploadedByName: user?.displayName || user?.email || user?.uid || "User"
       }, mediaFile);
       
       setShowUpload(false);
