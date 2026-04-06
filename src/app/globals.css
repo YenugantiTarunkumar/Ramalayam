@@ -45,11 +45,31 @@
 
 body {
   background-color: var(--bg-main);
+  background-image: url('/temple-bg.jpg');
+  background-size: cover;
+  background-position: center center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--text-main);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   min-height: 100vh;
-  transition: background-color 0.3s ease;
   overflow-x: hidden;
+}
+
+/* Dark overlay so text & UI remain readable on top of the temple image */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 5, 0, 0.55);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Ensure all content sits above the overlay */
+#__next, main, .dashboard-container, .login-container {
+  position: relative;
+  z-index: 1;
 }
 
 /* Glassmorphism Classes */
